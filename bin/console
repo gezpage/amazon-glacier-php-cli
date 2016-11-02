@@ -1,0 +1,68 @@
+#!/usr/bin/php
+<?php
+
+require __DIR__ . '/../bootstrap.php';
+
+use Aws\Glacier\GlacierClient;
+
+$client = GlacierClient::factory(AWS_CONFIG);
+$glacier = new GezPage\Utility\Storage\Glacier($client);
+$vault = AWS_GLACIER_VAULT;
+
+$option =  isset($argv[1]) ? $argv[1] : null;
+
+try {
+    switch ($option) {
+
+    case 'upload':
+        $file = $argv[2];
+        if (!file_exists($file)) {
+            throw new Exception('Invalid file: ' . $file);
+        }
+        $id = $glacier->upload($vault, $file, $file);
+        echo "Stored file [{$file}]: {$id}\n";
+        break;
+
+    case 'list-jobs':
+        $jobs = $glacier->listJobs($vault);
+        foreach ($jobs as $job) {
+            echo d($job) . "\n";
+        }
+        break;
+
+    case 'request-inventory':
+        list($location, $jobid) = $glacier->requestInventory($vault);
+        echo "Location: {$location}\n";
+        echo "Job ID: {$jobid}\n";
+
+    case 'request-job':
+        $archiveId = $argv[2];
+        if (!$archiveId) {
+            throw new Exception('Invalid archive id');
+        }
+        list($location, $jobid) = $glacier->requestJob($vault, $archiveId);
+        echo "Location: {$location}\n";
+        echo "Job ID: {$jobid}\n";
+
+        break;
+
+    case 'download-job':
+        $jobId = $argv[2];
+        $targetFile = $argv[3];
+        if (!$jobId) {
+            throw new Exception('Invalid job id');
+        }
+        if (!$targetFile) {
+            throw new Exception('Invalid target file');
+        }
+        $description = $glacier->downloadArchive($vault, $jobId, $targetFile);
+        echo "Downloaded [{$description}] file: {$targetFile}\n";
+        break;
+
+    default:
+        echo "Options are upload, list-jobs, request-job\n";
+    }
+} catch (Exception $e) {
+    echo "Dang it! Errors...\n\n";
+    echo $e->getMessage() . "\n";
+}
